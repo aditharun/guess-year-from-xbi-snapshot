@@ -118,11 +118,12 @@ SUFFIXES = (
 )
 
 SCHEDULE_RE = re.compile(
-    r"(?:spdr|streettracks)(?:\s+s\s*&\s*p)?\s+biotech\s+etf\b.{0,160}?"
-    r"schedule of investments(?!\s*\(continued\))",
+    r"(?:spdr|streettracks)(?:\s*\(r\)|®)?"
+    r"(?:\s+s\s*&\s*p(?:\s*\(r\)|®)?)?\s+biotech\s+etf\b"
+    r".{0,220}?schedule of investments(?!\s*\(continued\))",
     re.I | re.S,
 )
-DOTTED_RE = re.compile(r"^(?P<name>.*?)\.{3,}\s*(?P<rest>.*)$")
+DOTTED_RE = re.compile(r"^(?P<name>.*?)\.{2,}\s*(?P<rest>.*)$")
 NUMBER_RE = re.compile(r"^[\d,]+(?:\.\d+)?$")
 CATEGORY_RE = re.compile(r"(?:—|--).*\d")
 
@@ -226,6 +227,17 @@ def clean_holding_name(name: str) -> str:
     return clean_name(text) or ""
 
 
+PLURALS = {
+    "pharmaceuticals": "pharmaceutical",
+    "therapeutics": "therapeutic",
+    "biosciences": "bioscience",
+    "sciences": "science",
+    "laboratories": "laboratory",
+    "technologies": "technology",
+    "holdings": "holding",
+}
+
+
 def norm_key(name: str) -> str:
     text = name.lower().replace("&", " and ")
     text = re.sub(r"(?:\([a-h]\))+", " ", text)
@@ -234,8 +246,7 @@ def norm_key(name: str) -> str:
     for token in text.split():
         if token in LEGAL:
             continue
-        if len(token) > 4 and token.endswith("s"):
-            token = token[:-1]
+        token = PLURALS.get(token, token)
         if token and token not in LEGAL:
             tokens.append(token)
     return " ".join(tokens)
@@ -248,7 +259,12 @@ def distinctive(tokens: list[str]) -> list[str]:
 def compatible(left: str | None, right: str | None) -> bool:
     if not left or not right:
         return False
-    shared = set(distinctive(norm_key(left).split())) & set(distinctive(norm_key(right).split()))
+    left_key, right_key = norm_key(left), norm_key(right)
+    if not left_key or not right_key:
+        return False
+    if left_key == right_key or left_key.startswith(right_key + " ") or right_key.startswith(left_key + " "):
+        return True
+    shared = set(distinctive(left_key.split())) & set(distinctive(right_key.split()))
     return bool(shared)
 
 
@@ -303,9 +319,17 @@ def parse_holdings_body(body: str) -> list[dict]:
                 if shares > 0 and value > 0 and "total" not in name.lower():
                     holdings.append({"name": name, "shares": shares, "value": value})
             continue
+        if any(phrase in low for phrase in ("table of contents", "schedule of investments", "see accompanying", "unaudited")):
+            pending = []
+            numbers = []
+            continue
+        if re.fullmatch(r"[A-Za-z]+ \d{1,2}, \d{4}", line):
+            continue
         if low.startswith(("common stock", "biotechnology", "security description", "schedule of")):
             continue
-        if low in {"shares", "value"}:
+        if low in {"shares", "value", "security", "description"}:
+            continue
+        if re.fullmatch(r"(?:\([a-h]\)\s*)+", line, re.I):
             continue
         if CATEGORY_RE.search(line) and "," not in line and not DOTTED_RE.search(line):
             continue
@@ -331,22 +355,22 @@ def extract_schedule(raw: str) -> list[dict]:
     text = to_text(raw)
     match = None
     for candidate in SCHEDULE_RE.finditer(text):
-        window = text[candidate.end():candidate.end() + 600]
-        if re.search(r"common stocks", window, re.I):
+        window = text[candidate.end():candidate.end() + 2500]
+        if re.search(r"common\s+stocks", window, re.I):
             match = candidate
             break
     if match is None:
         return []
-    rest = text[match.end():match.end() + 180000]
+    rest = text[match.end():match.end() + 250000]
     end = re.search(
-        r"\n(?:short term investments|total common stocks|total investments)\b",
+        r"(?:short\s+term\s+investments|total\s+common\s+stocks|total\s+investments)\b",
         rest,
         re.I,
     )
-    body = rest[: end.start()] if end else rest[:80000]
-    common = re.search(r"common stocks", body, re.I)
+    body = rest[: end.start()] if end else rest[:120000]
+    common = re.search(r"common\s+stocks", body, re.I)
     if common:
-        body = body[common.start():]
+        body = body[common.end():]
     return parse_holdings_body(body)
 
 
@@ -494,7 +518,7 @@ def load_holdings() -> list[dict]:
     for row in efts_filings():
         cache = HOLDING_DIR / f"{row['period']}.json"
         cached = cache_json(cache)
-        if cached and cached.get("accession") == row["accession"] and cached.get("holdings"):
+        if cached and cached.get("v") == 2 and cached.get("accession") == row["accession"] and cached.get("holdings"):
             reports.append(cached)
             continue
         try:
@@ -515,6 +539,7 @@ def load_holdings() -> list[dict]:
             print(f"skip thin parse {row['period']} {row['accession']}", flush=True)
             continue
         saved = {
+            "v": 2,
             "date": row["period"],
             "form": row["form"],
             "accession": row["accession"],
@@ -1169,6 +1194,10 @@ def self_test() -> None:
     assert clean_holding_name("Alexion Pharmaceuticals, Inc. (a)") == "Alexion Pharmaceuticals"
     assert compatible("Biogen Idec, Inc.", "Biogen Inc.")
     assert compatible("Amgen, Inc.", "Amgen Inc")
+    assert compatible("Ionis Pharmaceuticals", "Ionis Pharmaceuticals, Inc.")
+    assert compatible("Agios Pharmaceuticals", "Agios Pharmaceuticals, Inc.")
+    assert compatible("United Therapeutics", "United Therapeutics Corporation")
+    assert compatible("PTC Therapeutics", "PTC Therapeutics, Inc.")
     assert not compatible("Genentech, Inc.", "Ginkgo Bioworks")
     assert not compatible("United Therapeutics", "United Airlines")
     assert norm_key("Isis Pharmaceuticals, Inc.") == "isis pharmaceutical"
@@ -1189,6 +1218,33 @@ SHORT TERM INVESTMENTS -- 0.1%
     assert by_name["Amgen"]["value"] == 1132572
     assert "Charles River Laboratories International" in by_name
     assert by_name["Charles River Laboratories International"]["shares"] == 22740
+    wrapped = """
+SPDR(R) S&P(R) BIOTECH ETF
+SCHEDULE OF INVESTMENTS
+MARCH 31, 2008 (UNAUDITED)
+COMMON STOCKS -- 99.9%
+BIOTECHNOLOGY -- 99.9%
+Alexion Pharmaceuticals,
+  Inc. (a)(b)...............         128,809   $  7,638,374
+Alkermes, Inc. (a)(b).......         666,932      7,923,152
+SHORT TERM INVESTMENTS -- 0.2%
+"""
+    wrapped_rows = {row["name"]: row for row in extract_schedule(wrapped)}
+    assert wrapped_rows["Alexion Pharmaceuticals"]["shares"] == 128809
+    assert wrapped_rows["Alkermes"]["value"] == 7923152
+    short_leader = """
+SPDR BIOTECH ETF
+SCHEDULE OF INVESTMENTS
+SEPTEMBER 30, 2007 (UNAUDITED)
+COMMON STOCKS -- 99.9%
+United Therapeutics Corp. (a)..    93,775      6,239,789
+Vertex Pharmaceuticals, Inc.
+  (a)..........................   164,326      6,311,762
+SHORT TERM INVESTMENTS -- 0.1%
+"""
+    short_rows = {row["name"]: row for row in extract_schedule(short_leader)}
+    assert short_rows["United Therapeutics"]["shares"] == 93775
+    assert short_rows["Vertex Pharmaceuticals"]["shares"] == 164326
     lined = """
 SPDR S&P Biotech ETF
 SCHEDULE OF INVESTMENTS
