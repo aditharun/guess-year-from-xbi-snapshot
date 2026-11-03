@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#f3eee4">
+  <meta name="description" content="Guess the year of a real XBI session from the holdings and their share prices.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <title>Guess the year from the XBI tape</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/styles.css?v=6">
+</head>
+<body>
+  <div class="sheet">
+    <header>
+      <h1>Guess the year from the XBI tape</h1>
+      <p class="lede">We have chosen a random day in that year.</p>
+    </header>
+    <main id="board">
+      <div class="cols" role="group" aria-label="Sort the tape">
+        <button type="button" data-sort="name" data-label="Name" aria-sort="none">Name</button>
+        <button type="button" data-sort="cap" data-label="Cap" aria-sort="descending" aria-pressed="true">Cap</button>
+        <button type="button" data-sort="price" data-label="Price" aria-sort="none">Price</button>
+      </div>
+      <p id="status" class="status" role="status">Pulling a session…</p>
+      <ol id="tape"></ol>
+    </main>
+    <form id="guess" class="dock" autocomplete="off">
+      <div id="pickers">
+        <label class="year-hint" id="year-hint" for="year">2006–2026</label>
+        <div class="guess-row">
+          <div class="year-field">
+            <input id="year" name="tape-year" type="text" inputmode="numeric" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="Year" aria-autocomplete="list" aria-controls="year-list" aria-expanded="false" role="combobox">
+          </div>
+          <button type="submit" id="lock" disabled>Enter</button>
+        </div>
+        <div id="year-list" class="year-list" role="listbox" hidden></div>
+        <p class="year-note" id="year-note" hidden>2006–2026 only</p>
+      </div>
+      <div id="result" class="result" hidden>
+        <p class="when" id="result-when"></p>
+        <p class="session" id="result-day"></p>
+        <p class="distance" id="result-distance"></p>
+        <button type="button" id="again">Another session</button>
+      </div>
+    </form>
+  </div>
+  <noscript>
+    <p class="noscript">This page needs JavaScript to deal a session. It stays on this page and does not load remote code.</p>
+  </noscript>
+  <script src="js/app.js?v=8"></script>
+</body>
+</html>

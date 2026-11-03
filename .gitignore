@@ -1,0 +1,7 @@
+# Rebuild cache, including the date-to-filename map. Do not publish.
+data/.cache/
+__pycache__/
+*.pyc
+.env
+.env.*
+.DS_Store
