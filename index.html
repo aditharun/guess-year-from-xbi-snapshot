@@ -6,18 +6,18 @@
   <meta name="theme-color" content="#f3eee4">
   <meta name="description" content="Guess the year of a real XBI session from the holdings and their share prices.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
-  <title>Guess the year from the XBI tape</title>
+  <title>Guess the year from the XBI snapshot</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/styles.css?v=6">
 </head>
 <body>
   <div class="sheet">
     <header>
-      <h1>Guess the year from the XBI tape</h1>
+      <h1>Guess the year from the XBI snapshot</h1>
       <p class="lede">We have chosen a random day in that year.</p>
     </header>
     <main id="board">
-      <div class="cols" role="group" aria-label="Sort the tape">
+      <div class="cols" role="group" aria-label="Sort the snapshot">
         <button type="button" data-sort="name" data-label="Name" aria-sort="none">Name</button>
         <button type="button" data-sort="cap" data-label="Cap" aria-sort="descending" aria-pressed="true">Cap</button>
         <button type="button" data-sort="price" data-label="Price" aria-sort="none">Price</button>
